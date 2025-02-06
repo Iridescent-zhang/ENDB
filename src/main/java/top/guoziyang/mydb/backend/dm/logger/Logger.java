@@ -11,11 +11,14 @@ import top.guoziyang.mydb.backend.utils.Panic;
 import top.guoziyang.mydb.backend.utils.Parser;
 import top.guoziyang.mydb.common.Error;
 
+/**
+ * DM 层在每次对底层数据操作时，都会记录一条日志到磁盘上。在数据库奔溃之后，再次启动时，可以根据日志的内容，恢复数据文件，保证其一致性。
+ */
 public interface Logger {
-    void log(byte[] data);
-    void truncate(long x) throws Exception;
-    byte[] next();
-    void rewind();
+    void log(byte[] data);                                   // 将一个字节数组数据 data 包装为一条规范的 log 并追加写入日志文件
+    void truncate(long x) throws Exception;                  // 截掉日志文件多余的部分
+    byte[] next();                                           // 返回下一条日志 log 的字节数组 data
+    void rewind();                                           // 重置日志读取指针。
     void close();
 
     public static Logger create(String path) {

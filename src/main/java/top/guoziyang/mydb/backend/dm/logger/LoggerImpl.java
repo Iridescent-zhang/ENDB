@@ -15,21 +15,25 @@ import top.guoziyang.mydb.backend.utils.Parser;
 import top.guoziyang.mydb.common.Error;
 
 /**
- * 日志文件读写
- * 
  * 日志文件标准格式为：
  * [XChecksum] [Log1] [Log2] ... [LogN] [BadTail]
- * XChecksum 为后续所有日志计算的Checksum，int类型
+ *
+ * XChecksum 为后续所有日志计算的 Checksum，int类型
  * 
  * 每条正确日志的格式为：
  * [Size] [Checksum] [Data]
- * Size 4字节int 标识Data长度
- * Checksum 4字节int
+ * Size 4字节 int 标识 Data 长度
+ * Checksum 4字节 int
+ *
+ * BadTail 是在数据库崩溃时，没有来得及写完的日志数据，这个 BadTail 不一定存在。
  */
 public class LoggerImpl implements Logger {
 
     private static final int SEED = 13331;
 
+    /**
+     * 单条日志的格式偏移信息
+     */
     private static final int OF_SIZE = 0;
     private static final int OF_CHECKSUM = OF_SIZE + 4;
     private static final int OF_DATA = OF_CHECKSUM + 4;
@@ -40,8 +44,8 @@ public class LoggerImpl implements Logger {
     private FileChannel fc;
     private Lock lock;
 
-    private long position;  // 当前日志指针的位置
-    private long fileSize;  // 初始化时记录，log操作不更新
+    private long position;  // 整个日志文件的指针的位置
+    private long fileSize;  // 初始化时记录的日志文件的大小，进行 log 操作时不更新
     private int xChecksum;
 
     LoggerImpl(RandomAccessFile raf, FileChannel fc) {
@@ -60,6 +64,7 @@ public class LoggerImpl implements Logger {
     void init() {
         long size = 0;
         try {
+            // the length of this file, measured in bytes.
             size = file.length();
         } catch (IOException e) {
             Panic.panic(e);
@@ -82,7 +87,7 @@ public class LoggerImpl implements Logger {
         checkAndRemoveTail();
     }
 
-    // 检查并移除bad tail
+    // 检查并移除 BadTail
     private void checkAndRemoveTail() {
         rewind();
 
@@ -106,9 +111,15 @@ public class LoggerImpl implements Logger {
         } catch (IOException e) {
             Panic.panic(e);
         }
+
         rewind();
     }
 
+    /**
+     * 将此条日志累计计算到 xCheck
+     * 单条日志的 checksum 是用 log 的 data 算的
+     * 整个日志文件的 xchecksum 是用每条 log 算的
+     */
     private int calChecksum(int xCheck, byte[] log) {
         for (byte b : log) {
             xCheck = xCheck * SEED + b;
@@ -116,12 +127,14 @@ public class LoggerImpl implements Logger {
         return xCheck;
     }
 
+    // 将一个字节数组数据 data 包装为一条规范的 log 并追加写入日志文件
     @Override
     public void log(byte[] data) {
         byte[] log = wrapLog(data);
         ByteBuffer buf = ByteBuffer.wrap(log);
         lock.lock();
         try {
+            // fc.size(): The current size of this channel's file, measured in bytes
             fc.position(fc.size());
             fc.write(buf);
         } catch(IOException e) {
@@ -132,6 +145,7 @@ public class LoggerImpl implements Logger {
         updateXChecksum(log);
     }
 
+    // 在日志文件中追加写入一条 log 后更新日志文件的总校验和
     private void updateXChecksum(byte[] log) {
         this.xChecksum = calChecksum(this.xChecksum, log);
         try {
@@ -143,6 +157,7 @@ public class LoggerImpl implements Logger {
         }
     }
 
+    // 将一个字节数组数据 data 包装为一条规范的 log
     private byte[] wrapLog(byte[] data) {
         byte[] checksum = Parser.int2Byte(calChecksum(0, data));
         byte[] size = Parser.int2Byte(data.length);
@@ -171,7 +186,7 @@ public class LoggerImpl implements Logger {
             Panic.panic(e);
         }
         int size = Parser.parseInt(tmp.array());
-        if(position + size + OF_DATA > fileSize) {
+        if(position + OF_DATA + size > fileSize) {
             return null;
         }
 
@@ -205,6 +220,7 @@ public class LoggerImpl implements Logger {
         }
     }
 
+    // 更新成员变量 position 为 4
     @Override
     public void rewind() {
         position = 4;

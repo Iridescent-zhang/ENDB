@@ -6,10 +6,10 @@ import top.guoziyang.mydb.backend.dm.pageCache.PageCache;
 import top.guoziyang.mydb.backend.utils.Parser;
 
 /**
- * PageX管理普通页
+ * PageX 管理普通页
  * 普通页结构
  * [FreeSpaceOffset] [Data]
- * FreeSpaceOffset: 2字节 空闲位置开始偏移
+ * FreeSpaceOffset: 2字节，表示这一页的空闲位置  FSO（Free Space Offset） 的偏移
  */
 public class PageX {
     
@@ -23,20 +23,22 @@ public class PageX {
         return raw;
     }
 
-    private static void setFSO(byte[] raw, short ofData) {
-        System.arraycopy(Parser.short2Byte(ofData), 0, raw, OF_FREE, OF_DATA);
+    // 设置 FSO 偏移到 raw 里
+    private static void setFSO(byte[] raw, short fso) {
+        System.arraycopy(Parser.short2Byte(fso), 0, raw, OF_FREE, OF_DATA);
     }
 
-    // 获取pg的FSO
+    // 获取此页的 FSO 偏移
     public static short getFSO(Page pg) {
         return getFSO(pg.getData());
     }
 
+
     private static short getFSO(byte[] raw) {
-        return Parser.parseShort(Arrays.copyOfRange(raw, 0, 2));
+        return Parser.parseShort(Arrays.copyOfRange(raw, 0, OF_DATA));
     }
 
-    // 将raw插入pg中，返回插入位置
+    // 将 raw 接着写在 pg 中，返回 raw 插入的位置
     public static short insert(Page pg, byte[] raw) {
         pg.setDirty(true);
         short offset = getFSO(pg.getData());
@@ -45,12 +47,14 @@ public class PageX {
         return offset;
     }
 
-    // 获取页面的空闲空间大小
+    // 获取页面的空闲空间大小，注意不是空闲空间偏移
     public static int getFreeSpace(Page pg) {
         return PageCache.PAGE_SIZE - (int)getFSO(pg.getData());
     }
 
-    // 将raw插入pg中的offset位置，并将pg的offset设置为较大的offset
+    // TODO 两个函数 recoverInsert() 和 recoverUpdate() 用于在数据库崩溃后重新打开时，恢复例程直接插入数据以及修改数据使用。
+
+    // 将 raw 插入 pg 中的 offset 位置，并将 pg 的 FSO 设置为较大值
     public static void recoverInsert(Page pg, byte[] raw, short offset) {
         pg.setDirty(true);
         System.arraycopy(raw, 0, pg.getData(), offset, raw.length);
@@ -61,7 +65,7 @@ public class PageX {
         }
     }
 
-    // 将raw插入pg中的offset位置，不更新update
+    // 将 raw 插入 pg 中的 offset 位置，不更新 FSO
     public static void recoverUpdate(Page pg, byte[] raw, short offset) {
         pg.setDirty(true);
         System.arraycopy(raw, 0, pg.getData(), offset, raw.length);

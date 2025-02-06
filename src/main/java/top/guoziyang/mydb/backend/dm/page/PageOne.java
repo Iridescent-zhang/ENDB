@@ -6,10 +6,9 @@ import top.guoziyang.mydb.backend.dm.pageCache.PageCache;
 import top.guoziyang.mydb.backend.utils.RandomUtil;
 
 /**
- * 特殊管理第一页
- * ValidCheck
- * db启动时给100~107字节处填入一个随机字节，db关闭时将其拷贝到108~115字节
- * 用于判断上一次数据库是否正常关闭
+ * 数据库 ".db" 文件的第一页，特殊管理第一页
+ * ValidCheck：db 启动时给 100~107 字节处填入一个随机字节，db 关闭时将其拷贝到 108~115 字节（一共 8 个字节）
+ * 数据库在每次启动时，就会检查第一页两处的字节是否相同，以此来判断上一次是否正常关闭。如果是异常关闭，就需要执行数据的恢复流程。
  */
 public class PageOne {
     private static final int OF_VC = 100;
@@ -44,6 +43,6 @@ public class PageOne {
     }
 
     private static boolean checkVc(byte[] raw) {
-        return Arrays.equals(Arrays.copyOfRange(raw, OF_VC, OF_VC+LEN_VC), Arrays.copyOfRange(raw, OF_VC+LEN_VC, OF_VC+2*LEN_VC));
+        return Arrays.equals(Arrays.copyOfRange(raw, OF_VC, OF_VC + LEN_VC), Arrays.copyOfRange(raw, OF_VC+LEN_VC, OF_VC + 2*LEN_VC));
     }
 }

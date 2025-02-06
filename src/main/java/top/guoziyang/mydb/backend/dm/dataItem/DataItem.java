@@ -10,8 +10,11 @@ import top.guoziyang.mydb.backend.dm.page.Page;
 import top.guoziyang.mydb.backend.utils.Parser;
 import top.guoziyang.mydb.backend.utils.Types;
 
+/**
+ * DataItem 是 DM 层向上层提供的数据抽象。上层模块通过地址，向 DM 请求到对应的 DataItem，再获取到其中的数据。
+ */
 public interface DataItem {
-    SubArray data();
+    SubArray data();                                // // 该方法返回的形式是 SubArray，这个在页层面是数据共享的，并且返回的是这个 dataItem 的纯数据，不包含其他 dataItem 的格式，这个纯数据的格式就是 Entry
     
     void before();
     void unBefore();
@@ -34,7 +37,7 @@ public interface DataItem {
         return Bytes.concat(valid, size, raw);
     }
 
-    // 从页面的offset处解析处dataitem
+    // 从页面的 offset(页中数据偏移) 处解析出 dataitem，从 offset 开始长为 length 的都属于 dataitem
     public static DataItem parseDataItem(Page pg, short offset, DataManagerImpl dm) {
         byte[] raw = pg.getData();
         short size = Parser.parseShort(Arrays.copyOfRange(raw, offset+DataItemImpl.OF_SIZE, offset+DataItemImpl.OF_DATA));

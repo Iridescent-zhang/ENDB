@@ -5,7 +5,7 @@ import java.util.Map;
 
 import top.guoziyang.mydb.backend.tm.TransactionManagerImpl;
 
-// vm对一个事务的抽象
+// vm 对一个事务的抽象
 public class Transaction {
     public long xid;
     public int level;

@@ -11,6 +11,7 @@ public class Client {
     }
 
     public byte[] execute(byte[] stat) throws Exception {
+        // 我们的输入 pkg
         Package pkg = new Package(stat, null);
         Package resPkg = rt.roundTrip(pkg);
         if(resPkg.getErr() != null) {

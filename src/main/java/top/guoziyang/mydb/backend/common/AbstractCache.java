@@ -17,7 +17,7 @@ public abstract class AbstractCache<T> {
 
     private int maxResource;                            // 缓存的最大缓存资源数
     private int count = 0;                              // 缓存中元素的个数
-    private Lock lock;
+    private Lock lock;                                  // 为了应对多线程场景，在对以上公共内容修改时都要获得锁
 
     public AbstractCache(int maxResource) {
         this.maxResource = maxResource;
@@ -82,7 +82,7 @@ public abstract class AbstractCache<T> {
     }
 
     /**
-     * 强行释放一个缓存
+     * 减少缓存的引用计数一次，尝试刷回磁盘
      */
     protected void release(long key) {
         lock.lock();
@@ -103,7 +103,7 @@ public abstract class AbstractCache<T> {
     }
 
     /**
-     * 关闭缓存，写回所有资源
+     * 关闭缓存，写回所有资源（从缓存写回到磁盘）
      */
     protected void close() {
         lock.lock();
@@ -111,7 +111,7 @@ public abstract class AbstractCache<T> {
             Set<Long> keys = cache.keySet();
             for (long key : keys) {
                 T obj = cache.get(key);
-                releaseForCache(obj);
+                releaseForCache(obj);        // 将缓存中所有的资源写回磁盘。
                 references.remove(key);
                 cache.remove(key);
             }

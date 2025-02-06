@@ -19,6 +19,9 @@ public interface TransactionManager {
     boolean isAborted(long xid);
     void close();
 
+    /**
+     * 在 Java 8 之前，接口中仅允许定义抽象方法（即没有实现的方法），不能包含具体实现的方法。但从 Java 8 开始，Java 接口增加了两类新方法：静态方法（static）和默认方法（default）。这些方法可以包含实现代码。
+     */
     public static TransactionManagerImpl create(String path) {
         File f = new File(path+TransactionManagerImpl.XID_SUFFIX);
         try {

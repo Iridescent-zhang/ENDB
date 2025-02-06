@@ -19,6 +19,10 @@ import top.guoziyang.mydb.backend.tm.TransactionManager;
 import top.guoziyang.mydb.backend.utils.Panic;
 import top.guoziyang.mydb.backend.utils.Parser;
 
+/**
+ * DM 为上层模块，提供了两种操作，分别是插入新数据（I）和更新现有数据（U），至于为啥没有删除数据，这个会在 VM 一节叙述。
+ * DM 的日志策略很简单，一句话就是：在进行 I 和 U 操作之前，必须先进行对应的日志操作，在保证日志写入磁盘后，才进行数据操作。即 WAL
+ */
 public class Recover {
 
     private static final byte LOG_TYPE_INSERT = 0;
@@ -86,12 +90,14 @@ public class Recover {
                 InsertLogInfo li = parseInsertLog(log);
                 long xid = li.xid;
                 if(!tm.isActive(xid)) {
+                    // 已完成的事务就要 redo
                     doInsertLog(pc, log, REDO);
                 }
             } else {
                 UpdateLogInfo xi = parseUpdateLog(log);
                 long xid = xi.xid;
                 if(!tm.isActive(xid)) {
+                    // 已完成的事务就要 redo
                     doUpdateLog(pc, log, REDO);
                 }
             }
@@ -108,6 +114,7 @@ public class Recover {
                 InsertLogInfo li = parseInsertLog(log);
                 long xid = li.xid;
                 if(tm.isActive(xid)) {
+                    // 活跃的要 undo
                     if(!logCache.containsKey(xid)) {
                         logCache.put(xid, new ArrayList<>());
                     }
@@ -117,6 +124,7 @@ public class Recover {
                 UpdateLogInfo xi = parseUpdateLog(log);
                 long xid = xi.xid;
                 if(tm.isActive(xid)) {
+                    // 活跃的要 undo
                     if(!logCache.containsKey(xid)) {
                         logCache.put(xid, new ArrayList<>());
                     }
@@ -125,7 +133,11 @@ public class Recover {
             }
         }
 
-        // 对所有active log进行倒序undo
+        /**
+         *      对所有 active log 进行倒序 undo
+         * 作者说：由于上层（VM）保证了事务的隔离，多个 active 事务之间并不会互相读写数据，因此各事务所操作的 dataItem 是隔离的（只有 finished 事务的数据才可能被其他事务读到），
+         * 所以在 undo 的时候也无需按照 active 事务的开始时间去 undo（当然按照开始时间 undo 也没问题）
+         */
         for(Entry<Long, List<byte[]>> entry : logCache.entrySet()) {
             List<byte[]> logs = entry.getValue();
             for (int i = logs.size()-1; i >= 0; i --) {
@@ -136,6 +148,7 @@ public class Recover {
                     doUpdateLog(pc, log, UNDO);
                 }
             }
+            // 把这些 active 事务修改状态为 abort
             tm.abort(entry.getKey());
         }
     }

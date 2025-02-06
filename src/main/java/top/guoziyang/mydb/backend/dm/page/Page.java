@@ -1,5 +1,8 @@
 package top.guoziyang.mydb.backend.dm.page;
 
+/**
+ * 内存中的页
+ */
 public interface Page {
     void lock();
     void unlock();

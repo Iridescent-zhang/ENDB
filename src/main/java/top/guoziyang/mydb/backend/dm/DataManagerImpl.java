@@ -15,6 +15,10 @@ import top.guoziyang.mydb.backend.utils.Panic;
 import top.guoziyang.mydb.backend.utils.Types;
 import top.guoziyang.mydb.common.Error;
 
+/**
+ * DataManager 是 DM 层直接对外提供方法的类，同时，也实现成 DataItem 对象的缓存。
+ * 而缓存 DataItem 对象使用的 key，是由页号和页内偏移组成的一个 8 字节无符号整数，页号和偏移各占 4 字节。
+ */
 public class DataManagerImpl extends AbstractCache<DataItem> implements DataManager {
 
     TransactionManager tm;
@@ -45,6 +49,7 @@ public class DataManagerImpl extends AbstractCache<DataItem> implements DataMana
     public long insert(long xid, byte[] data) throws Exception {
         byte[] raw = DataItem.wrapDataItemRaw(data);
         if(raw.length > PageX.MAX_FREE_SPACE) {
+            // 这里不允许一个数据项超过一个页允许存放的空间
             throw Error.DataTooLargeException;
         }
 
@@ -66,6 +71,7 @@ public class DataManagerImpl extends AbstractCache<DataItem> implements DataMana
         int freeSpace = 0;
         try {
             pg = pc.getPage(pi.pgno);
+            // 首先需要写入插入日志，接着才可以通过 pageX 插入数据，并返回插入位置的偏移。
             byte[] log = Recover.insertLog(xid, pg, raw);
             logger.log(log);
 
@@ -75,7 +81,7 @@ public class DataManagerImpl extends AbstractCache<DataItem> implements DataMana
             return Types.addressToUid(pi.pgno, offset);
 
         } finally {
-            // 将取出的pg重新插入pIndex
+            // 将取出的 pg 重新插入pIndex
             if(pg != null) {
                 pIndex.add(pi.pgno, PageX.getFreeSpace(pg));
             } else {
@@ -89,12 +95,13 @@ public class DataManagerImpl extends AbstractCache<DataItem> implements DataMana
         super.close();
         logger.close();
 
+        // 关闭时设置第一页的字节校验
         PageOne.setVcClose(pageOne);
         pageOne.release();
         pc.close();
     }
 
-    // 为xid生成update日志
+    // 生成 update 日志
     public void logDataItem(long xid, DataItem di) {
         byte[] log = Recover.updateLog(xid, di);
         logger.log(log);
@@ -104,6 +111,7 @@ public class DataManagerImpl extends AbstractCache<DataItem> implements DataMana
         super.release(di.getUid());
     }
 
+    // 继承 AbstractCache<DataItem> 要实现的
     @Override
     protected DataItem getForCache(long uid) throws Exception {
         short offset = (short)(uid & ((1L << 16) - 1));
@@ -113,12 +121,14 @@ public class DataManagerImpl extends AbstractCache<DataItem> implements DataMana
         return DataItem.parseDataItem(pg, offset, this);
     }
 
+    // 继承 AbstractCache<DataItem> 要实现的
     @Override
     protected void releaseForCache(DataItem di) {
+        // 需要将 DataItem 写回数据源，由于对文件的读写是以页为单位进行的，只需要将 DataItem 所在的页 release 即可
         di.page().release();
     }
 
-    // 在创建文件时初始化PageOne
+    // 在创建文件时初始化 PageOne
     void initPageOne() {
         int pgno = pc.newPage(PageOne.InitRaw());
         assert pgno == 1;
@@ -130,7 +140,7 @@ public class DataManagerImpl extends AbstractCache<DataItem> implements DataMana
         pc.flushPage(pageOne);
     }
 
-    // 在打开已有文件时时读入PageOne，并验证正确性
+    // 在打开已有文件时时读入 PageOne，并验证正确性
     boolean loadCheckPageOne() {
         try {
             pageOne = pc.getPage(1);
