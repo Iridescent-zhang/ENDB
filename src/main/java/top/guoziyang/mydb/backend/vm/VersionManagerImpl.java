@@ -12,11 +12,14 @@ import top.guoziyang.mydb.backend.tm.TransactionManagerImpl;
 import top.guoziyang.mydb.backend.utils.Panic;
 import top.guoziyang.mydb.common.Error;
 
+/**
+ * 是记录的缓存 AbstractCache<Entry>
+ */
 public class VersionManagerImpl extends AbstractCache<Entry> implements VersionManager {
 
     TransactionManager tm;
     DataManager dm;
-    Map<Long, Transaction> activeTransaction;
+    Map<Long, Transaction> activeTransaction;                               // 活跃事务列表，主要用于创建快照
     Lock lock;
     LockTable lt;
 
@@ -96,6 +99,7 @@ public class VersionManagerImpl extends AbstractCache<Entry> implements VersionM
         }
         try {
             if(!Visibility.isVisible(tm, t, entry)) {
+                // 不可见的话就不能删
                 return false;
             }
             Lock l = null;
@@ -103,11 +107,12 @@ public class VersionManagerImpl extends AbstractCache<Entry> implements VersionM
                 l = lt.add(xid, uid);
             } catch(Exception e) {
                 t.err = Error.ConcurrentUpdateException;
-                internAbort(xid, true);
+                internAbort(xid, true);             // TODO 这两个什么区别
                 t.autoAborted = true;
                 throw t.err;
             }
-            if(l != null) {
+            if(l != null) {                                       // TODO 这在搞毛
+                // 由于这两个操作对已加锁状态影响仅限锁计数器的增减，一般来说，核心初衷应该是验证该锁对象确实可以被加锁和解锁成功（在无阻情况下）。
                 l.lock();
                 l.unlock();
             }
@@ -116,10 +121,11 @@ public class VersionManagerImpl extends AbstractCache<Entry> implements VersionM
                 return false;
             }
 
+            // isVersionSkip 很诡异
             if(Visibility.isVersionSkip(tm, t, entry)) {
                 t.err = Error.ConcurrentUpdateException;
                 internAbort(xid, true);
-                t.autoAborted = true;
+                t.autoAborted = true;     // 标记事务为自动中止状态。
                 throw t.err;
             }
 
@@ -168,11 +174,16 @@ public class VersionManagerImpl extends AbstractCache<Entry> implements VersionM
         tm.commit(xid);
     }
 
+    /**
+     * abort 事务的方法则有两种，手动和自动。手动指的是调用 abort() 方法，而自动，则是在事务被检测出出现死锁时，会自动撤销回滚事务；
+     * TODO 或者出现版本跳跃时，也会自动回滚：
+     */
     @Override
     public void abort(long xid) {
         internAbort(xid, false);
     }
 
+    // 内部中断事务 ，autoAborted = true 表示强制中止。
     private void internAbort(long xid, boolean autoAborted) {
         lock.lock();
         Transaction t = activeTransaction.get(xid);
@@ -190,6 +201,7 @@ public class VersionManagerImpl extends AbstractCache<Entry> implements VersionM
         super.release(entry.getUid());
     }
 
+    // 来自 AbstractCache<Entry>
     @Override
     protected Entry getForCache(long uid) throws Exception {
         Entry entry = Entry.loadEntry(this, uid);
@@ -199,6 +211,7 @@ public class VersionManagerImpl extends AbstractCache<Entry> implements VersionM
         return entry;
     }
 
+    // 来自 AbstractCache<Entry>
     @Override
     protected void releaseForCache(Entry entry) {
         entry.remove();

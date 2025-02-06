@@ -15,11 +15,11 @@ import top.guoziyang.mydb.common.Error;
  */
 public class LockTable {
     
-    private Map<Long, List<Long>> x2u;  // 某个XID已经获得的资源的UID列表
-    private Map<Long, Long> u2x;        // UID被某个XID持有
-    private Map<Long, List<Long>> wait; // 正在等待UID的XID列表
-    private Map<Long, Lock> waitLock;   // 正在等待资源的XID的锁
-    private Map<Long, Long> waitU;      // XID正在等待的UID
+    private Map<Long, List<Long>> x2u;  // 某个 XID 已经获得的资源的 UID 列表
+    private Map<Long, Long> u2x;        // UID 被某个 XID 持有
+    private Map<Long, List<Long>> wait; // 正在等待 UID 的 XID 列表
+    private Map<Long, Lock> waitLock;   // 这个 xid 正在等待获得的资源锁对象
+    private Map<Long, Long> waitU;      // XID 正在等待的 UID   waitU.put(xid, uid);
     private Lock lock;
 
     public LockTable() {
@@ -31,7 +31,7 @@ public class LockTable {
         lock = new ReentrantLock();
     }
 
-    // 不需要等待则返回null，否则返回锁对象
+    // 不需要等待（加锁成功）则返回null，否则返回需要等待的锁对象
     // 会造成死锁则抛出异常
     public Lock add(long xid, long uid) throws Exception {
         lock.lock();
@@ -62,6 +62,7 @@ public class LockTable {
         }
     }
 
+    // 释放这个 xid 持有的所有资源
     public void remove(long xid) {
         lock.lock();
         try {
@@ -81,7 +82,7 @@ public class LockTable {
         }
     }
 
-    // 从等待队列中选择一个xid来占用uid
+    // 从等待队列中选择一个 xid 来占用此 uid
     private void selectNewXID(long uid) {
         u2x.remove(uid);
         List<Long> l = wait.get(uid);
@@ -133,9 +134,9 @@ public class LockTable {
         }
         xidStamp.put(xid, stamp);
 
-        Long uid = waitU.get(xid);
+        Long uid = waitU.get(xid);  // 这个 xid 正在等待的 uid
         if(uid == null) return false;
-        Long x = u2x.get(uid);
+        Long x = u2x.get(uid);    // 持有这个 uid 的 xid
         assert x != null;
         return dfs(x);
     }

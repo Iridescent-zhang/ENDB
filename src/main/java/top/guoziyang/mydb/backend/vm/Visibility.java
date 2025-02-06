@@ -3,12 +3,15 @@ package top.guoziyang.mydb.backend.vm;
 import top.guoziyang.mydb.backend.tm.TransactionManager;
 
 public class Visibility {
-    
+
+    // int level = begin.isRepeatableRead?1:0;
     public static boolean isVersionSkip(TransactionManager tm, Transaction t, Entry e) {
         long xmax = e.getXmax();
         if(t.level == 0) {
+            // 读提交允许版本跳跃所以返回 false
             return false;
         } else {
+            // 可重复读不允许，并且如果发生了针对删除操作的版本跳跃（删除已经提交了 且 删除不可见）则返回 true 对事务中断
             return tm.isCommitted(xmax) && (xmax > t.xid || t.isInSnapshot(xmax));
         }
     }
