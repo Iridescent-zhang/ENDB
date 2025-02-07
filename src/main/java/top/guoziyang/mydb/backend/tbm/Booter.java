@@ -9,7 +9,7 @@ import java.nio.file.StandardCopyOption;
 import top.guoziyang.mydb.backend.utils.Panic;
 import top.guoziyang.mydb.common.Error;
 
-// 记录第一个表的uid
+// 记录第一个表的 uid
 public class Booter {
     public static final String BOOTER_SUFFIX = ".bt";
     public static final String BOOTER_TMP_SUFFIX = ".bt_tmp";

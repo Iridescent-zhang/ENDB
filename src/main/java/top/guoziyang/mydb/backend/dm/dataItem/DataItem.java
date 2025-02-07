@@ -14,7 +14,7 @@ import top.guoziyang.mydb.backend.utils.Types;
  * DataItem 是 DM 层向上层提供的数据抽象。上层模块通过地址，向 DM 请求到对应的 DataItem，再获取到其中的数据。
  */
 public interface DataItem {
-    SubArray data();                                // // 该方法返回的形式是 SubArray，这个在页层面是数据共享的，并且返回的是这个 dataItem 的纯数据，不包含其他 dataItem 的格式，这个纯数据的格式就是 Entry
+    SubArray data();                                // // 该方法返回的形式是 SubArray，这个在页层面是数据共享的。并且返回的是这个 dataItem 的纯数据，不包含其他 dataItem 的格式，这个纯数据的格式就是 Entry 记录
     
     void before();
     void unBefore();

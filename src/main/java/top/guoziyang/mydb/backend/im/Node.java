@@ -13,6 +13,12 @@ import top.guoziyang.mydb.backend.utils.Parser;
  * Node结构如下：
  * [LeafFlag][KeyNumber][SiblingUid]
  * [Son0][Key0][Son1][Key1]...[SonN][KeyN]
+ *
+ * 每个 Node 都存储在一条 DataItem 中。
+ * 其中 LeafFlag 标记了该节点是否是个叶子节点；
+ * KeyNumber 为该节点中 key 的个数；
+ * SiblingUid 是其兄弟节点存储在 DM 中的 UID。（这个节点的同一层的右节点）
+ * 后续是穿插的子节点（SonN，Son 应该就是资源的 uid）和 KeyN（应该只是序号）。最后的一个 KeyN 始终为 MAX_VALUE，以此方便查找。
  */
 public class Node {
     static final int IS_LEAF_OFFSET = 0;
@@ -23,9 +29,9 @@ public class Node {
     static final int BALANCE_NUMBER = 32;
     static final int NODE_SIZE = NODE_HEADER_SIZE + (2*8)*(BALANCE_NUMBER*2+2);
 
-    BPlusTree tree;
-    DataItem dataItem;
-    SubArray raw;
+    BPlusTree tree;                                                  // 持有了其 B+ 树结构的引用
+    DataItem dataItem;                                               // DataItem 的引用
+    SubArray raw;                                                    // SubArray 的引用
     long uid;
 
     static void setRawIsLeaf(SubArray raw, boolean isLeaf) {
@@ -56,6 +62,7 @@ public class Node {
         return Parser.parseLong(Arrays.copyOfRange(raw.raw, raw.start+SIBLING_OFFSET, raw.start+SIBLING_OFFSET+8));
     }
 
+    // [Son0][Key0][Son1][Key1]...[SonN][KeyN]
     static void setRawKthSon(SubArray raw, long uid, int kth) {
         int offset = raw.start+NODE_HEADER_SIZE+kth*(8*2);
         System.arraycopy(Parser.long2Byte(uid), 0, raw.raw, offset, 8);
@@ -76,11 +83,13 @@ public class Node {
         return Parser.parseLong(Arrays.copyOfRange(raw.raw, offset, offset+8));
     }
 
+    // from 从第 k 个开始的内容拷贝到 to 的第0个开始
     static void copyRawFromKth(SubArray from, SubArray to, int kth) {
         int offset = from.start+NODE_HEADER_SIZE+kth*(8*2);
         System.arraycopy(from.raw, offset, to.raw, to.start+NODE_HEADER_SIZE, from.end-offset);
     }
 
+    // 从第 k+1 个开始的内容都等于前一个 [Son][Key] 的内容
     static void shiftRawKth(SubArray raw, int kth) {
         int begin = raw.start+NODE_HEADER_SIZE+(kth+1)*(8*2);
         int end = raw.start+NODE_SIZE-1;
@@ -89,12 +98,14 @@ public class Node {
         }
     }
 
+    // 根节点的初始两个子节点为 left 和 right, 初始键值为 key。
     static byte[] newRootRaw(long left, long right, long key)  {
         SubArray raw = new SubArray(new byte[NODE_SIZE], 0, NODE_SIZE);
 
         setRawIsLeaf(raw, false);
         setRawNoKeys(raw, 2);
         setRawSibling(raw, 0);
+        // [Son][Key]
         setRawKthSon(raw, left, 0);
         setRawKthKey(raw, key, 0);
         setRawKthSon(raw, right, 1);
@@ -103,6 +114,7 @@ public class Node {
         return raw.raw;
     }
 
+    // 空的根节点
     static byte[] newNilRootRaw()  {
         SubArray raw = new SubArray(new byte[NODE_SIZE], 0, NODE_SIZE);
 
@@ -119,7 +131,7 @@ public class Node {
         Node n = new Node();
         n.tree = bTree;
         n.dataItem = di;
-        n.raw = di.data();
+        n.raw = di.data();              // dataItem 的纯数据
         n.uid = uid;
         return n;
     }
@@ -142,6 +154,7 @@ public class Node {
         long siblingUid;
     }
 
+    // searchNext 寻找对应 key 的 UID, 如果找不到, 则需要返回兄弟节点的 UID（后面接着找）。
     public SearchNextRes searchNext(long key) {
         dataItem.rLock();
         try {
@@ -150,6 +163,7 @@ public class Node {
             for(int i = 0; i < noKeys; i ++) {
                 long ik = getRawKthKey(raw, i);
                 if(key < ik) {
+                    // 找第一个比 key 大的那一对 [Son][Key]
                     res.uid = getRawKthSon(raw, i);
                     res.siblingUid = 0;
                     return res;
@@ -169,6 +183,7 @@ public class Node {
         long siblingUid;
     }
 
+    // leafSearchRange 方法在当前节点进行范围查找，范围是 [leftKey, rightKey]，这里约定如果 rightKey 大于等于该节点的最大的 key, 则还同时返回兄弟节点的 UID，方便继续搜索下一个节点。
     public LeafSearchRangeRes leafSearchRange(long leftKey, long rightKey) {
         dataItem.rLock();
         try {
@@ -191,6 +206,7 @@ public class Node {
                     break;
                 }
             }
+
             long siblingUid = 0;
             if(kth == noKeys) {
                 siblingUid = getRawSibling(raw);
@@ -204,6 +220,7 @@ public class Node {
         }
     }
 
+    // 插入节点以及分裂
     class InsertAndSplitRes {
         long siblingUid, newSon, newKey;
     }
@@ -265,7 +282,7 @@ public class Node {
             setRawKthKey(raw, key, kth);
             shiftRawKth(raw, kth+1);
             setRawKthKey(raw, kk, kth+1);
-            setRawKthSon(raw, uid, kth+1);
+            setRawKthSon(raw, uid, kth+1);                      // TODO 这里我存疑，应该是setRawKthSon(raw, uid, kth);吧
             setRawNoKeys(raw, noKeys+1);
         }
         return true;
@@ -290,8 +307,8 @@ public class Node {
         setRawSibling(raw, son);
 
         SplitRes res = new SplitRes();
-        res.newSon = son;
-        res.newKey = getRawKthKey(nodeRaw, 0);
+        res.newSon = son;                                                               // 分裂出来的节点
+        res.newKey = getRawKthKey(nodeRaw, 0);                                    // 分裂出来的节点的第0个节点的 key，之所以是第0个可能是 B+ 树节点的 key 是它的子节点的 key 的最小值（头晕了）
         return res;
     }
 

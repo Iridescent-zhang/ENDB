@@ -10,6 +10,7 @@ import top.guoziyang.mydb.backend.parser.statement.Update;
 import top.guoziyang.mydb.backend.utils.Parser;
 import top.guoziyang.mydb.backend.vm.VersionManager;
 
+// TBM 实现了对字段结构和表结构的管理
 public interface TableManager {
     BeginRes begin(Begin begin);
     byte[] commit(long xid) throws Exception;

@@ -26,6 +26,9 @@ import top.guoziyang.mydb.common.Error;
  * 二进制结构如下：
  * [TableName][NextTable]
  * [Field1Uid][Field2Uid]...[FieldNUid]
+ *
+ * 一个数据库中存在多张表，TBM 使用链表的形式将其组织起来，每一张表都保存一个指向下一张表的 UID。
+ *
  */
 public class Table {
     TableManager tbm;

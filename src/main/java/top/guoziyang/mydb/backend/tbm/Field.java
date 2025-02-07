@@ -18,6 +18,10 @@ import top.guoziyang.mydb.common.Error;
  * 二进制格式为：
  * [FieldName][TypeName][IndexUid]
  * 如果field无索引，IndexUid为0
+ *
+ * FieldName 和 TypeName 存储的都是字节形式的字符串，形式为：[StringLength][StringData]
+ * TypeName 为字段的类型，限定为 int32、int64 和 string 类型。
+ * 如果这个字段有索引，那个 IndexUID 指向了索引二叉树的根，否则该字段为 0。
  */
 public class Field {
     long uid;
@@ -27,6 +31,7 @@ public class Field {
     private long index;
     private BPlusTree bt;
 
+    // 通过一个 UID 从 VM 中读取并解析
     public static Field loadField(Table tb, long uid) {
         byte[] raw = null;
         try {
@@ -82,6 +87,7 @@ public class Field {
         return f;
     }
 
+    // 创建一个字段的方法类似，将相关的信息通过 VM 持久化
     private void persistSelf(long xid) throws Exception {
         byte[] nameRaw = Parser.string2Byte(fieldName);
         byte[] typeRaw = Parser.string2Byte(fieldType);

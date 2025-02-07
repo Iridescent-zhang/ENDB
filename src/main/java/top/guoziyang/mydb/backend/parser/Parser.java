@@ -17,6 +17,7 @@ import top.guoziyang.mydb.backend.parser.statement.Update;
 import top.guoziyang.mydb.backend.parser.statement.Where;
 import top.guoziyang.mydb.common.Error;
 
+// 直接对外提供了 Parse(byte[] statement) 方法，核心就是一个调用 Tokenizer 类分割 Token，并根据词法规则包装成具体的 Statement 类并返回。
 public class Parser {
     public static Object Parse(byte[] statement) throws Exception {
         Tokenizer tokenizer = new Tokenizer(statement);
