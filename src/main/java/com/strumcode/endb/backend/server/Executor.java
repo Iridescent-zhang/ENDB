@@ -2,7 +2,6 @@ package com.strumcode.endb.backend.server;
 
 import com.strumcode.endb.backend.parser.statement.*;
 import com.strumcode.endb.backend.parser.Parser;
-import com.strumcode.endb.transport.mydb.backend.parser.statement.*;
 import com.strumcode.endb.backend.tbm.BeginRes;
 import com.strumcode.endb.backend.tbm.TableManager;
 import com.strumcode.endb.common.Error;

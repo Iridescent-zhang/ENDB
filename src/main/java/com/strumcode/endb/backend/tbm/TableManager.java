@@ -4,7 +4,6 @@ import com.strumcode.endb.backend.dm.DataManager;
 import com.strumcode.endb.backend.parser.statement.*;
 import com.strumcode.endb.backend.utils.Parser;
 import com.strumcode.endb.backend.vm.VersionManager;
-import com.strumcode.endb.transport.mydb.backend.parser.statement.*;
 
 // TBM 实现了对字段结构和表结构的管理
 public interface TableManager {
